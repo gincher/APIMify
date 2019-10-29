@@ -1,0 +1,26 @@
+# name: Build and Publish
+
+# on:
+#   push:
+#     branches:
+#       - master
+#       - release/*
+
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: checkout
+#         uses: actions/checkout@v1
+#       - name: Setup Node
+#         uses: actions/setup-node@v1
+#         with:
+#           node-version: 12
+#       - name: npm install
+#         run: npm install
+#       - name: Run tests
+#         run: npm test -- --detectOpenHandles
+#       - name: compile typescript
+#         run: npm run build
+#       - name: npm publish
+#         run: npm publish
