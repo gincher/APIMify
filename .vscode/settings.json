@@ -3,6 +3,8 @@
     "amsify",
     "analiyse",
     "apimanagement",
-    "regexy"
+    "httpcode",
+    "regexy",
+    "xmlbuilder"
   ]
 }

@@ -1,5 +1,6 @@
 import express from "express";
 import { usersRouter } from "./users";
+import { postsRouter } from "./posts";
 
 export const app = express();
 
@@ -10,4 +11,4 @@ app.get("/contact-us", (req, res) => res.status(200));
 app.get("/users", usersRouter);
 
 // app.use();
-app.get("/posts");
+app.get("/posts", postsRouter);
