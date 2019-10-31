@@ -1,5 +1,5 @@
 import { begin } from "xmlbuilder";
-import { Policy } from "../policy";
+import { Policy } from "../endpoint";
 
 /**
  * `check-header` policy:
@@ -19,7 +19,7 @@ export const checkHeader = (
   });
   if (value) value.forEach(v => root.element("value", {}, v));
 
-  const xml = root.up().end({
+  const xml = root.end({
     pretty: true
   });
 
@@ -71,7 +71,7 @@ export const rateLimit = (config: RateLimitAttributes) => {
       if (operation) operation.forEach(op => apiElem.element("operation", op));
     });
 
-  const xml = root.up().end({
+  const xml = root.end({
     pretty: true
   });
 
@@ -127,7 +127,7 @@ export const rateLimitByKey = (config: RateLimitByKeyAttributes) => {
     "increment-condition": config["increment-condition"] ? "True" : "False"
   });
 
-  const xml = root.up().end({
+  const xml = root.end({
     pretty: true
   });
 

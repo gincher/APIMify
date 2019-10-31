@@ -1,43 +1,161 @@
-import { Express, Router } from "express";
+import { Express, Router as originalRouter } from "express";
 import { OperationContract } from "@azure/arm-apimanagement/esm/models";
+import { Location, Endpoint as EndpointEntity } from "./endpoint";
+import { RequestHandler } from "express-serve-static-core";
 
 /**
  * Converts Express app or router to AMS
  */
 export class ExpressToAMS {
+  // I never liked using regex, but now I'm really hating it.
+  private paramRegex = /\(\?\:(\\\/|)\(.*?\)\)\??/gi;
+  private removalRegex = /\/\^|\/i|\\\/\?\$|\\\/\?\(\?\=\\\/\|\$\)/gi;
+  private slashRegex = /\\\//gi;
+
   private operationIdCount = 0;
   private endpoints: Endpoints = {};
 
-  constructor(private express: Express | Router) {}
+  /**
+   * Create ExpressToAMS instance
+   * @param express - express app or router
+   * @param basePath - base path for the endpoints
+   */
+  constructor(
+    private express: Express | Router,
+    private basePath: string = ""
+  ) {
+    this.loopLayers(this.express);
+    console.log(JSON.stringify(this.endpoints));
+  }
 
+  /**
+   * Loop in layers, look for routes and endpoints' middleware, and
+   * populate the endpoints object
+   * @param express - express app or router
+   * @param basePath - base path for the endpoints
+   * @param endpoints - list of endpoints to append
+   */
   private loopLayers(
-    express: Express | Router,
+    express: Express | Router | Route,
     basePath: string = "",
-    endpoints: Endpoint[] = []
+    endpoints: EndpointEntity[] = []
   ) {
     const stack: Layer[] =
       "_router" in express ? express._router.stack : express.stack;
 
-    stack.forEach(stackItem => {
-      if (stackItem.route) {
-        const endpoint = parseExpressRoute(stackItem.route, basePath);
-
-        endpoints = this.addEndpoint(endpoints, endpoint);
-      } else if (
-        stackItem.name === "router" ||
-        stackItem.name === "bound dispatch"
-      ) {
-        const parsedPath = parseExpressPath(stackItem.regexp, stackItem.keys);
-
-        this.loopLayers(
-          stackItem.handle as Router,
-          basePath + "/" + parsedPath,
-          endpoints
-        );
+    stack.forEach(layer => {
+      if (layer.name === "AMSEndpoint") {
+        const endpoint = EndpointEntity.find(layer.handle as RequestHandler);
+        if (endpoint) endpoints.push(endpoint);
+        return;
       }
+
+      if (layer.route && this.isRoute(layer.route, basePath, endpoints)) return;
+
+      const path = this.getPath(layer);
+
+      if (layer.route && layer.route.stack && layer.route.stack.length)
+        return this.loopLayers(layer.route, this.margePath(basePath, path), [
+          ...endpoints
+        ]);
+
+      if (layer.handle && "stack" in layer.handle)
+        return this.loopLayers(layer.handle, this.margePath(basePath, path), [
+          ...endpoints
+        ]);
+    });
+  }
+
+  /**
+   * Returns path from a layer
+   * @param layer - a layer
+   */
+  private getPath(layer: Layer) {
+    if (layer.path) return this.trimSlash(layer.path);
+    if (layer.regexp.fast_slash) return "";
+    return this.trimSlash(this.decodeRegex(layer.regexp, layer.keys));
+  }
+
+  /**
+   * marges paths
+   * @param paths - a path to marge
+   */
+  private margePath(...paths: string[]) {
+    return paths
+      .map(path => this.trimSlash(path))
+      .filter(path => !!path.length)
+      .join("/");
+  }
+
+  /**
+   * Checks if it's a route. If it is, it'll add it to the endpoints
+   * object and will return true, otherwise, false.
+   * @param route - a route
+   * @param basePath - the path to append to route's path
+   * @param endpoints - list of endpoints to prepend to the route
+   */
+  private isRoute(
+    route: Route,
+    basePath: string = "",
+    endpoints: EndpointEntity[] = []
+  ) {
+    if (!route.methods) return false;
+    if (!route.stack || !route.stack.length) return false;
+
+    let method: Methods;
+    const path = this.margePath(basePath, route.path);
+
+    const isRoute = route.stack.every(layer => {
+      // If layer don't have a method, it's not a route.
+      if (!layer.method) return false;
+      // If layer's regex is not simple slash, it's not a route
+      if (!layer.regexp) return false;
+      // If layer don't have function, non router handles,
+      // you guessed it, it's not a route!
+      if (
+        !layer.handle ||
+        ("stack" in layer.handle &&
+          layer.handle.stack.some(subLayer => subLayer.name && subLayer.regexp))
+      )
+        return false;
+
+      if (layer.name === "AMSEndpoint") {
+        const endpoint = EndpointEntity.find(layer.handle as RequestHandler);
+        if (endpoint) endpoints.push(endpoint);
+      }
+
+      if (method !== layer.method) method = layer.method;
+
+      return true;
     });
 
-    return endpoints;
+    if (isRoute) {
+      this.addEndpoint(
+        `/${path}`,
+        method,
+        EndpointEntity.margeEndpoints(endpoints)
+      );
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Convert regex to path
+   * @param regex - Regex to convert into path
+   * @param params - path's params
+   */
+  private decodeRegex(regex: RegExp, params: Key[]) {
+    params = params.sort((a, b) => a.offset - b.offset);
+    const regexStr = regex.toString();
+    let counter = 0;
+
+    const path = regexStr
+      .replace(this.paramRegex, (m, p1) => `${p1}:${params[counter++].name}`)
+      .replace(this.removalRegex, "")
+      .replace(this.slashRegex, "/");
+
+    return path;
   }
 
   /**
@@ -48,12 +166,38 @@ export class ExpressToAMS {
    * @param method - HTTP verb
    * @param endpoint - endpoint information
    */
-  private addEndpoint(path: string, method: Methods, endpoint?: Endpoint) {
+  private addEndpoint(
+    path: string,
+    method: Methods,
+    endpoint?: Partial<EndpointWithPolicyObj>
+  ) {
     if (!this.endpoints[path]) this.endpoints[path] = {};
+
+    const oldEndpoint =
+      this.endpoints[path][method] ||
+      ({ policies: {} } as EndpointWithPolicyObj);
 
     const { urlTemplate, templateParameters } = this.getParams(path);
     const operationId = this.generateOperationId(path, method);
     const displayName = this.generateOperationName(path, method);
+    const policies: EndpointWithPolicyObj["policies"] = {
+      inbound: [
+        ...(oldEndpoint.policies.inbound || []),
+        ...(endpoint.policies.inbound || [])
+      ],
+      backend: [
+        ...(oldEndpoint.policies.backend || []),
+        ...(endpoint.policies.backend || [])
+      ],
+      outbound: [
+        ...(oldEndpoint.policies.outbound || []),
+        ...(endpoint.policies.outbound || [])
+      ],
+      "on-error": [
+        ...(oldEndpoint.policies["on-error"] || []),
+        ...(endpoint.policies["on-error"] || [])
+      ]
+    };
 
     this.endpoints[path][method] = {
       operationId,
@@ -61,8 +205,9 @@ export class ExpressToAMS {
       method,
       urlTemplate,
       templateParameters,
-      ...(this.endpoints[path][method] || {}),
-      ...(endpoint || {})
+      ...(oldEndpoint || {}),
+      ...(endpoint || {}),
+      policies
     };
   }
 
@@ -88,7 +233,7 @@ export class ExpressToAMS {
               .map(pathPart => {
                 // if has regex or starts with :
                 // I'll consider it as a param
-                const regexToCheckIfRegex = /[\:\?\+\*\(\)]/g;
+                const regexToCheckIfRegex = /[\:\?\+\*\(\)\|]/g;
                 if (regexToCheckIfRegex.test(pathPart)) {
                   // Remove all regexy stuff.
                   pathPart = pathPart.replace(regexToCheckIfRegex, "");
@@ -143,7 +288,7 @@ export class ExpressToAMS {
   private generateOperationName(path: string, method: Methods) {
     path = this.trimSlash(path)
       .split(" ")
-      .map(t => this.capitalize(t))
+      .map(t => t && this.capitalize(t))
       .join(" ");
     method = this.capitalize(method) as Methods;
 
@@ -164,7 +309,7 @@ export class ExpressToAMS {
    * @param str - string to trim slashes
    */
   private trimSlash(str: string) {
-    return str.trim().replace(/\/$|^\//g, " ");
+    return str.trim().replace(/\/$|^\//g, "");
   }
 }
 
@@ -182,13 +327,25 @@ interface Route {
   methods: { [key in Methods]?: boolean };
 }
 
+interface Router extends originalRouter {
+  stack: Layer[];
+}
+
 interface Layer {
+  // It can be either a function or a Router, I won't use is in the types
+  // to avoid `any[]`
   handle: Function | Router;
-  name: "expressInit" | "query" | "bound dispatch" | "router" | "<anonymous>";
-  params: undefined;
-  path: undefined;
+  name:
+    | "expressInit"
+    | "query"
+    | "bound dispatch"
+    | "router"
+    | "<anonymous>"
+    | "AMSEndpoint";
+  params?: any[];
+  path?: string;
   keys: Key[];
-  regexp: RegExp;
+  regexp: RegExp & { fast_star: boolean; fast_slash: boolean };
   route?: Route;
   method?: Methods;
 }
@@ -198,8 +355,15 @@ interface Endpoint extends OperationContract {
   operationId: string;
 }
 
+export interface EndpointWithPolicyObj extends Omit<Endpoint, "policies"> {
+  /** Operation Policies */
+  policies: {
+    [key in Location]?: string[];
+  };
+}
+
 interface Endpoints {
   [path: string]: {
-    [method in Methods]?: Endpoint;
+    [method in Methods]?: EndpointWithPolicyObj;
   };
 }

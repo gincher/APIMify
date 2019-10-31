@@ -23,18 +23,18 @@ export class AzureAuthentication {
     let credentials: ServiceClientCredentials;
     let subscription: string;
 
-    if ("username" in this.authentication) {
+    if (!!this.authentication && "username" in this.authentication) {
       // Username and password authentication
       credentials = await this.usernamePassword(
         this.authentication.username,
         this.authentication.password
       );
       subscription = this.authentication.subscription;
-    } else if ("credentials" in this.authentication) {
+    } else if (!!this.authentication && "credentials" in this.authentication) {
       // Credentials authentication
       credentials = this.authentication.credentials;
       subscription = this.authentication.subscription;
-    } else if ("subscription" in this.authentication) {
+    } else if (!!this.authentication && "subscription" in this.authentication) {
       // Interactive authentication
       credentials = await this.interactive();
       subscription = this.authentication.subscription;
