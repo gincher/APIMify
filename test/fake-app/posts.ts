@@ -1,5 +1,6 @@
 import { checkHeader } from "../../src/policies/access-restriction";
 import { Router } from "express";
+import { Metadata } from "../../src/endpoint";
 
 export const postsRouter = Router();
 
@@ -17,6 +18,8 @@ postsRouter.get(
 );
 
 postsRouter.post("/", (req, res) => res.status(200));
-postsRouter.post("/:id", (req, res) => res.status(200));
+postsRouter.post("/:id", Metadata.set({ displayName: "HELLO" }), (req, res) =>
+  res.status(200)
+);
 
 postsRouter.delete("/:id", (req, res) => res.status(200));

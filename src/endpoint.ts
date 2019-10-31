@@ -130,4 +130,4 @@ export type Location = "inbound" | "backend" | "outbound" | "on-error";
 /**
  * Endpoint's metadata
  */
-export type EndpointMetadata = Omit<EndpointWithPolicyObj, "policies">;
+export type EndpointMetadata = Partial<Omit<EndpointWithPolicyObj, "policies">>;

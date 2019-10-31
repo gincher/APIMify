@@ -1,5 +1,5 @@
 import { Express, Router as originalRouter } from "express";
-import { OperationContract } from "@azure/arm-apimanagement/esm/models";
+import { OperationContract, Resource } from "@azure/arm-apimanagement/esm/models";
 import { Location, Endpoint as EndpointEntity } from "./endpoint";
 import { RequestHandler } from "express-serve-static-core";
 
@@ -24,7 +24,7 @@ export class ExpressToAMS {
     private express: Express | Router,
     private basePath: string = ""
   ) {
-    this.loopLayers(this.express);
+    this.loopLayers(this.express, this.basePath);
     console.log(JSON.stringify(this.endpoints));
   }
 
@@ -33,7 +33,7 @@ export class ExpressToAMS {
    * populate the endpoints object
    * @param express - express app or router
    * @param basePath - base path for the endpoints
-   * @param endpoints - list of endpoints to append
+   * @param endpoints - endpoints list of metadata and policies
    */
   private loopLayers(
     express: Express | Router | Route,
@@ -44,25 +44,36 @@ export class ExpressToAMS {
       "_router" in express ? express._router.stack : express.stack;
 
     stack.forEach(layer => {
+      // If layer is an AMSify middleware, add it to the endpoints list of metadata and policies
       if (layer.name === "AMSEndpoint") {
         const endpoint = EndpointEntity.find(layer.handle as RequestHandler);
-        if (endpoint) endpoints.push(endpoint);
+        // Recreate to prevent error due to arrays being passed by reference
+        if (endpoint) endpoints = [...endpoints, endpoint];
         return;
       }
 
-      if (layer.route && this.isRoute(layer.route, basePath, endpoints)) return;
+      // If layer is a route, add it as an endpoint. Pass endpoints
+      // by value (kinda).
+      if (layer.route && this.isRoute(layer.route, basePath, [...endpoints]))
+        return;
 
       const path = this.getPath(layer);
 
+      // If has route, follow it's stack.
       if (layer.route && layer.route.stack && layer.route.stack.length)
-        return this.loopLayers(layer.route, this.margePath(basePath, path), [
-          ...endpoints
-        ]);
+        return this.loopLayers(
+          layer.route,
+          this.margePath(basePath, path),
+          endpoints
+        );
 
+      // If handle is a Router, follow it's stack.
       if (layer.handle && "stack" in layer.handle)
-        return this.loopLayers(layer.handle, this.margePath(basePath, path), [
-          ...endpoints
-        ]);
+        return this.loopLayers(
+          layer.handle,
+          this.margePath(basePath, path),
+          endpoints
+        );
     });
   }
 
@@ -92,7 +103,7 @@ export class ExpressToAMS {
    * object and will return true, otherwise, false.
    * @param route - a route
    * @param basePath - the path to append to route's path
-   * @param endpoints - list of endpoints to prepend to the route
+   * @param endpoints - endpoints list of metadata and policies
    */
   private isRoute(
     route: Route,
@@ -219,7 +230,7 @@ export class ExpressToAMS {
   private getParams(path: string) {
     const templateParameters: Endpoint["templateParameters"] = [];
 
-    const urlTemplate = this.trimSlash(path)
+    const urlTemplate = path
       .split("/")
       // What's going on?
       .map(subPath =>
@@ -275,9 +286,10 @@ export class ExpressToAMS {
     path = this.trimSlash(path)
       .trim()
       .toLowerCase()
-      .replace(/\/$|^\//g, "-");
+      .replace(/\//g, "-")
+      .replace(/[^A-z0-9\-]/g, "");
 
-    return `${path}-${method}-${++this.operationIdCount}`;
+    return `${path.substr(0, 30)}-${method}-${++this.operationIdCount}`;
   }
 
   /**
@@ -287,12 +299,14 @@ export class ExpressToAMS {
    */
   private generateOperationName(path: string, method: Methods) {
     path = this.trimSlash(path)
+      .replace(/\/|\-/g, " ")
+      .replace(/[^A-z0-9\ ]/g, "")
       .split(" ")
       .map(t => t && this.capitalize(t))
       .join(" ");
     method = this.capitalize(method) as Methods;
 
-    return `${method} ${path}`;
+    return `${method} ${path.substr(0, 30)}`;
   }
 
   /**
@@ -350,7 +364,7 @@ interface Layer {
   method?: Methods;
 }
 
-interface Endpoint extends OperationContract {
+interface Endpoint extends Omit<OperationContract, keyof Resource> {
   /** Operation identifier within an API. Must be unique in the current API Management service instance. */
   operationId: string;
 }

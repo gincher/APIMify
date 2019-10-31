@@ -6,22 +6,25 @@ import { Policy } from "../../src/endpoint";
 export const app = express();
 
 app.get("/", (req, res) => res.status(200));
-app.get("/about", Policy.create("XML8", "backend"), (req, res) =>
+app.get("/about", Policy.create("about only", "backend"), (req, res) =>
   res.status(200)
 );
 app.get("/contact-us", (req, res) => res.status(200));
 
 app.get("/users", usersRouter);
 
-app.use(Policy.create("XML4", "backend"), Policy.create("XML", "backend"));
+app.use(
+  Policy.create("usersfake and posts", "backend"),
+  Policy.create("usersfake and posts again", "backend")
+);
 app.use(
   "/usersFaker/:userId?-?:userIds/aa?fr(aa|rew)/werf",
-  Policy.create("XML5", "backend"),
+  Policy.create("usersfake only", "backend"),
   usersRouter
 );
 app.get(
   "/posts",
-  Policy.create("XML6", "backend"),
-  Policy.create("XML7", "backend"),
+  Policy.create("posts only", "backend"),
+  Policy.create("posts only again", "backend"),
   postsRouter
 );
