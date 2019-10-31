@@ -1,5 +1,8 @@
 import { Express, Router as originalRouter } from "express";
-import { OperationContract, Resource } from "@azure/arm-apimanagement/esm/models";
+import {
+  OperationContract,
+  Resource
+} from "@azure/arm-apimanagement/esm/models";
 import { Location, Endpoint as EndpointEntity } from "./endpoint";
 import { RequestHandler } from "express-serve-static-core";
 
@@ -287,9 +290,10 @@ export class ExpressToAMS {
       .trim()
       .toLowerCase()
       .replace(/\//g, "-")
-      .replace(/[^A-z0-9\-]/g, "");
+      .replace(/[^A-z0-9\-]/g, "")
+      .substr(0, 30);
 
-    return `${path.substr(0, 30)}-${method}-${++this.operationIdCount}`;
+    return `${this.trimMinus(path)}-${method}-${++this.operationIdCount}`;
   }
 
   /**
@@ -324,6 +328,14 @@ export class ExpressToAMS {
    */
   private trimSlash(str: string) {
     return str.trim().replace(/\/$|^\//g, "");
+  }
+
+  /**
+   * Remove leading and trialing minus
+   * @param str - string to trim minuses
+   */
+  private trimMinus(str: string) {
+    return str.trim().replace(/\-$|^\-/g, "");
   }
 }
 
