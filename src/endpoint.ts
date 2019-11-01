@@ -1,6 +1,6 @@
 import { begin } from 'xmlbuilder';
 import { RequestHandler } from 'express';
-import { EndpointWithPolicyObj } from './express-to-ams';
+import { EndpointWithPolicyObj } from './express-to-apim';
 
 /**
  * Abstract class to extend the Policy class and the Metadata class
@@ -17,7 +17,7 @@ export abstract class Endpoint {
    */
   constructor() {
     this.func = (req, res, next) => next();
-    Object.defineProperty(this.func, 'name', { value: 'AMSEndpoint' });
+    Object.defineProperty(this.func, 'name', { value: 'APIMEndpoint' });
   }
 
   /**

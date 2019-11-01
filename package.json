@@ -1,11 +1,11 @@
 {
-  "name": "amsify",
+  "name": "apimify",
   "version": "1.0.0",
   "description": "Update Azure API Management Service's endpoints based on ExpressJS routes",
   "main": "./lib/main.js",
   "types": "./lib",
   "bin": {
-    "amsify": "./lib/cli.js"
+    "apimify": "./lib/cli.js"
   },
   "repository": {
     "type": "git",
@@ -16,7 +16,7 @@
   },
   "keywords": [
     "azure",
-    "ams",
+    "apim",
     "api",
     "management",
     "service",

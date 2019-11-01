@@ -5,9 +5,9 @@ import { RequestHandler } from 'express-serve-static-core';
 import { Logger } from './logger';
 
 /**
- * Converts Express app or router to AMS
+ * Converts Express app or router to APIM
  */
-export class ExpressToAMS {
+export class ExpressToAPIM {
   // I never liked using regex, but now I'm really hating it.
   private paramRegex = /\(\?\:(\\\/|)\(.*?\)\)\??/gi;
   private removalRegex = /\/\^|\/i|\\\/\?\$|\\\/\?\(\?\=\\\/\|\$\)/gi;
@@ -17,7 +17,7 @@ export class ExpressToAMS {
   private endpoints: Endpoints = {};
 
   /**
-   * Create ExpressToAMS instance
+   * Create ExpressToAPIM instance
    * @param logger - a logger
    * @param express - express app or router
    * @param basePath - base path for the endpoints
@@ -33,7 +33,7 @@ export class ExpressToAMS {
     // Clear endpoints
     this.endpoints = {};
 
-    this.logger.info("Looking for routes");
+    this.logger.info('Looking for routes');
     this.loopLayers(this.express, this.basePath);
     this.locateSamePath(breakOnSamePath);
 
@@ -45,7 +45,7 @@ export class ExpressToAMS {
    * @param breakOnSamePath - should throw error if a same path found?
    */
   private locateSamePath(breakOnSamePath: boolean) {
-    this.logger.info("Looking for pathes overlap");
+    this.logger.info('Looking for pathes overlap');
 
     const pathes: { [path: string]: { [method in Methods]?: boolean } } = {};
     let foundSamePath = false;
@@ -80,8 +80,8 @@ export class ExpressToAMS {
     const stack: Layer[] = '_router' in express ? express._router.stack : express.stack;
 
     stack.forEach(layer => {
-      // If layer is an AMSify middleware, add it to the endpoints list of metadata and policies
-      if (layer.name === 'AMSEndpoint') {
+      // If layer is an APIMify middleware, add it to the endpoints list of metadata and policies
+      if (layer.name === 'APIMEndpoint') {
         const endpoint = EndpointEntity.find(layer.handle as RequestHandler);
         // Recreate to prevent error due to arrays being passed by reference
         if (endpoint) endpoints = [...endpoints, endpoint];
@@ -96,11 +96,11 @@ export class ExpressToAMS {
 
       // If has route, follow it's stack.
       if (layer.route && layer.route.stack && layer.route.stack.length)
-        return this.loopLayers(layer.route, ExpressToAMS.margePath(basePath, path), endpoints);
+        return this.loopLayers(layer.route, ExpressToAPIM.margePath(basePath, path), endpoints);
 
       // If handle is a Router, follow it's stack.
       if (layer.handle && 'stack' in layer.handle)
-        return this.loopLayers(layer.handle, ExpressToAMS.margePath(basePath, path), endpoints);
+        return this.loopLayers(layer.handle, ExpressToAPIM.margePath(basePath, path), endpoints);
     });
   }
 
@@ -109,9 +109,9 @@ export class ExpressToAMS {
    * @param layer - a layer
    */
   private getPath(layer: Layer) {
-    if (layer.path) return ExpressToAMS.trimSlash(layer.path);
+    if (layer.path) return ExpressToAPIM.trimSlash(layer.path);
     if (layer.regexp.fast_slash) return '';
-    return ExpressToAMS.trimSlash(this.decodeRegex(layer.regexp, layer.keys));
+    return ExpressToAPIM.trimSlash(this.decodeRegex(layer.regexp, layer.keys));
   }
 
   /**
@@ -126,7 +126,7 @@ export class ExpressToAMS {
     if (!route.stack || !route.stack.length) return false;
 
     let method: Methods;
-    const path = ExpressToAMS.margePath(basePath, route.path);
+    const path = ExpressToAPIM.margePath(basePath, route.path);
 
     const isRoute = route.stack.every(layer => {
       // If layer don't have a method, it's not a route.
@@ -141,7 +141,7 @@ export class ExpressToAMS {
       )
         return false;
 
-      if (layer.name === 'AMSEndpoint') {
+      if (layer.name === 'APIMEndpoint') {
         const endpoint = EndpointEntity.find(layer.handle as RequestHandler);
         if (endpoint) endpoints.push(endpoint);
       }
@@ -215,7 +215,7 @@ export class ExpressToAMS {
   }
 
   /**
-   * Looks for params, changes it to match the way AMS stores params in URL
+   * Looks for params, changes it to match the way APIM stores params in URL
    * and generates templateParameters object
    * @param path - full path to look for params
    */
@@ -252,7 +252,7 @@ export class ExpressToAMS {
                     type: 'string'
                   });
 
-                  // Convert to AMS path param
+                  // Convert to APIM path param
                   pathPart = `{${pathPart}}`;
                 }
                 return pathPart;
@@ -272,14 +272,14 @@ export class ExpressToAMS {
    * @param method - Operation method
    */
   private generateOperationId(path: string, method: Methods) {
-    path = ExpressToAMS.trimSlash(path)
+    path = ExpressToAPIM.trimSlash(path)
       .trim()
       .toLowerCase()
       .replace(/\//g, '-')
       .replace(/[^A-z0-9\-]/g, '')
       .substr(0, 30);
 
-    return `amsify-${ExpressToAMS.trimMinus(path)}-${method}-${++this.operationIdCount}`;
+    return `apimify-${ExpressToAPIM.trimMinus(path)}-${method}-${++this.operationIdCount}`;
   }
 
   /**
@@ -288,7 +288,7 @@ export class ExpressToAMS {
    * @param method - Operation method
    */
   private generateOperationName(path: string, method: Methods) {
-    path = ExpressToAMS.trimSlash(path)
+    path = ExpressToAPIM.trimSlash(path)
       .replace(/\/|\-/g, ' ')
       .replace(/[^A-z0-9\ ]/g, '')
       .split(' ')
@@ -314,7 +314,7 @@ export class ExpressToAMS {
    */
   public static margePath(...paths: string[]) {
     return paths
-      .map(path => ExpressToAMS.trimSlash(path))
+      .map(path => ExpressToAPIM.trimSlash(path))
       .filter(path => !!path.length)
       .join('/');
   }
@@ -358,7 +358,7 @@ interface Layer {
   // It can be either a function or a Router, I won't use is in the types
   // to avoid `any[]`
   handle: Function | Router;
-  name: 'expressInit' | 'query' | 'bound dispatch' | 'router' | '<anonymous>' | 'AMSEndpoint';
+  name: 'expressInit' | 'query' | 'bound dispatch' | 'router' | '<anonymous>' | 'APIMEndpoint';
   params?: any[];
   path?: string;
   keys: Key[];

@@ -15,51 +15,44 @@ export class AzureAuthentication {
   constructor(private logger: Logger, private authentication?: Authentication) {}
 
   /**
-   * Executes authentication and returns Azure AMS client
+   * Executes authentication and returns Azure APIM client
    */
   public async authenticate() {
-    let credentials: ServiceClientCredentials;
-    let subscription: string;
+    try {
+      let credentials: ServiceClientCredentials;
+      let subscription: string;
 
-    if (!!this.authentication && 'username' in this.authentication) {
-      // Username and password authentication
-      this.logger.info('Authenticating using username and password');
-      const cred = await this.usernamePassword(this.authentication.username, this.authentication.password).catch(e =>
-        this.logger.error(e)
-      );
-      if (!cred) return Promise.reject();
+      if (!!this.authentication && 'username' in this.authentication) {
+        // Username and password authentication
+        this.logger.info('Authenticating using username and password');
+        credentials = await this.usernamePassword(this.authentication.username, this.authentication.password);
+        subscription = this.authentication.subscription;
+      } else if (!!this.authentication && 'credentials' in this.authentication) {
+        // Credentials authentication
+        this.logger.info('Authenticating using service credentials');
+        credentials = this.authentication.credentials;
+        subscription = this.authentication.subscription;
+      } else if (!!this.authentication && 'subscription' in this.authentication) {
+        // Interactive authentication
+        this.logger.info('Authenticating using interactive authentication');
+        credentials = await this.interactive();
+        subscription = this.authentication.subscription;
+      } else {
+        // CLI Authentication
+        this.logger.info('Authenticating using CLI');
+        credentials = await this.CLI();
+        subscription = (credentials as AzureCliCredentials).tokenInfo.subscription;
+      }
+      this.logger.info('Authenticated successfully');
 
-      credentials = cred;
-      subscription = this.authentication.subscription;
-    } else if (!!this.authentication && 'credentials' in this.authentication) {
-      // Credentials authentication
-      this.logger.info('Authenticating using service credentials');
-      credentials = this.authentication.credentials;
-      subscription = this.authentication.subscription;
-    } else if (!!this.authentication && 'subscription' in this.authentication) {
-      // Interactive authentication
-      this.logger.info('Authenticating using interactive authentication');
-      const cred = await this.interactive().catch(e => this.logger.error(e));
-      if (!cred) return Promise.reject();
-
-      credentials = cred;
-      subscription = this.authentication.subscription;
-    } else {
-      // CLI Authentication
-      this.logger.info('Authenticating using CLI');
-      const cred = await this.CLI().catch(e => this.logger.error(e));
-      if (!cred) return Promise.reject();
-
-      credentials = cred;
-      subscription = (credentials as AzureCliCredentials).tokenInfo.subscription;
+      return this.getClient(credentials, subscription);
+    } catch (e) {
+      return Promise.reject(e);
     }
-    this.logger.info('Authenticated successfully');
-
-    return this.getClient(credentials, subscription);
   }
 
   /**
-   * Initializes a new instance of the Azure AMS client
+   * Initializes a new instance of the Azure APIM client
    * @param credentials - Credentials needed for the client to connect to Azure.
    * @param subscription - Microsoft Azure subscription.
    */
