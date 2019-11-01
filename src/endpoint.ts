@@ -64,13 +64,13 @@ export abstract class Endpoint {
  */
 export class Metadata extends Endpoint {
   /** Endpoint's metadata */
-  public endpointMetadata: EndpointMetadata;
+  public endpointMetadata: Partial<EndpointMetadata>;
 
   /**
    * Create a metadata
    * @param endpointMetadata - Endpoint's metadata
    */
-  private constructor(metadata: EndpointMetadata) {
+  private constructor(metadata: Partial<EndpointMetadata>) {
     super();
 
     this.endpointMetadata = metadata;
@@ -82,7 +82,7 @@ export class Metadata extends Endpoint {
    * Create a metadata and returns it's express middleware
    * @param endpointMetadata - Endpoint's metadata
    */
-  public static set(endpointMetadata: EndpointMetadata) {
+  public static set(endpointMetadata: Partial<EndpointMetadata>) {
     const metadata = new Metadata(endpointMetadata);
     return metadata.func;
   }
@@ -166,4 +166,6 @@ export type Location = 'inbound' | 'backend' | 'outbound' | 'on-error';
 /**
  * Endpoint's metadata
  */
-export type EndpointMetadata = Partial<Omit<EndpointWithPolicyObj, 'policies'>>;
+export type EndpointMetadata = Partial<
+  Omit<EndpointWithPolicyObj, 'policies' | 'templateParameters' | 'method' | 'urlTemplate'>
+>;
