@@ -1,6 +1,7 @@
 import { AzureCliCredentials, interactiveLogin, loginWithUsernamePassword } from '@azure/ms-rest-nodeauth';
 import { ApiManagementClient } from '@azure/arm-apimanagement';
 import { ServiceClientCredentials } from '@azure/ms-rest-js';
+import { Logger } from './logger';
 
 /**
  * Authentication class
@@ -8,9 +9,10 @@ import { ServiceClientCredentials } from '@azure/ms-rest-js';
 export class AzureAuthentication {
   /**
    * Creates an authentication class
+   * @param logger - a logger
    * @param authentication - authentication options
    */
-  constructor(private authentication?: Authentication) {}
+  constructor(private logger: Logger, private authentication?: Authentication) {}
 
   /**
    * Executes authentication and returns Azure AMS client
@@ -21,21 +23,37 @@ export class AzureAuthentication {
 
     if (!!this.authentication && 'username' in this.authentication) {
       // Username and password authentication
-      credentials = await this.usernamePassword(this.authentication.username, this.authentication.password);
+      this.logger.info('Authenticating using username and password');
+      const cred = await this.usernamePassword(this.authentication.username, this.authentication.password).catch(e =>
+        this.logger.error(e)
+      );
+      if (!cred) return Promise.reject();
+
+      credentials = cred;
       subscription = this.authentication.subscription;
     } else if (!!this.authentication && 'credentials' in this.authentication) {
       // Credentials authentication
+      this.logger.info('Authenticating using service credentials');
       credentials = this.authentication.credentials;
       subscription = this.authentication.subscription;
     } else if (!!this.authentication && 'subscription' in this.authentication) {
       // Interactive authentication
-      credentials = await this.interactive();
+      this.logger.info('Authenticating using interactive authentication');
+      const cred = await this.interactive().catch(e => this.logger.error(e));
+      if (!cred) return Promise.reject();
+
+      credentials = cred;
       subscription = this.authentication.subscription;
     } else {
       // CLI Authentication
-      credentials = await this.CLI();
+      this.logger.info('Authenticating using CLI');
+      const cred = await this.CLI().catch(e => this.logger.error(e));
+      if (!cred) return Promise.reject();
+
+      credentials = cred;
       subscription = (credentials as AzureCliCredentials).tokenInfo.subscription;
     }
+    this.logger.info('Authenticated successfully');
 
     return this.getClient(credentials, subscription);
   }
@@ -52,8 +70,8 @@ export class AzureAuthentication {
   /**
    * Authenticates using CLI. Before execution, user must run `az login`.
    */
-  private async CLI() {
-    return await AzureCliCredentials.create();
+  private CLI() {
+    return AzureCliCredentials.create();
   }
 
   /**
@@ -61,15 +79,15 @@ export class AzureAuthentication {
    * @param username
    * @param password
    */
-  private async usernamePassword(username: string, password: string) {
-    return await loginWithUsernamePassword(username, password);
+  private usernamePassword(username: string, password: string) {
+    return loginWithUsernamePassword(username, password);
   }
 
   /**
    * Authenticates using an interactive process.
    */
-  private async interactive() {
-    return await interactiveLogin();
+  private interactive() {
+    return interactiveLogin();
   }
 }
 

@@ -10,7 +10,6 @@
 
     "module": "commonjs",
     "target": "es5",
-    "types": ["jest"],
     "lib": ["dom", "es2019"],
 
     "experimentalDecorators": true,
@@ -23,10 +22,5 @@
     "moduleResolution": "node"
   },
   "include": ["src/**/*", "declarations/**/*"],
-  "exclude": [
-    "node_modules",
-    "./node_modules",
-    "./node_modules/*",
-    "./node_modules/@types/node/index.d.ts"
-  ]
+  "exclude": ["node_modules", "./node_modules", "./node_modules/*", "./node_modules/@types/node/index.d.ts"]
 }

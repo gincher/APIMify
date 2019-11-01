@@ -1,3 +1,4 @@
+import { begin } from 'xmlbuilder';
 import { RequestHandler } from 'express';
 import { EndpointWithPolicyObj } from './express-to-ams';
 
@@ -124,6 +125,33 @@ export class Policy extends Endpoint {
   public static create(xml: string, location: Location) {
     const policy = new Policy(xml, location);
     return policy.func;
+  }
+
+  /**
+   * Convert policies object to an XML
+   * @param policies - policies object
+   */
+  public static toXML(policies: EndpointWithPolicyObj['policies']) {
+    return `
+      <policies>
+        <inbound>
+          ${(policies && policies['inbound'].join('\n          ')) || ''}
+          <base />
+        </inbound>
+        <backend>
+          ${(policies && policies['backend'].join('\n          ')) || ''}
+          <base />
+        </backend>
+        <outbound>
+          ${(policies && policies['outbound'].join('\n          ')) || ''}
+          <base />
+        </outbound>
+        <on-error>
+          ${(policies && policies['on-error'].join('\n          ')) || ''}
+          <base />
+        </on-error>
+      </policies>
+    `;
   }
 }
 

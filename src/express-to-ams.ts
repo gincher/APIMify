@@ -2,6 +2,7 @@ import { Express, Router as originalRouter } from 'express';
 import { OperationContract, Resource } from '@azure/arm-apimanagement/esm/models';
 import { Location, Endpoint as EndpointEntity } from './endpoint';
 import { RequestHandler } from 'express-serve-static-core';
+import { Logger } from './logger';
 
 /**
  * Converts Express app or router to AMS
@@ -17,10 +18,11 @@ export class ExpressToAMS {
 
   /**
    * Create ExpressToAMS instance
+   * @param logger - a logger
    * @param express - express app or router
    * @param basePath - base path for the endpoints
    */
-  constructor(private express: Express | Router, private basePath: string = '') {}
+  constructor(private logger: Logger, private express: Express | Router, private basePath: string = '') {}
 
   /**
    * Execute express lookup and return endpoints
@@ -31,6 +33,7 @@ export class ExpressToAMS {
     // Clear endpoints
     this.endpoints = {};
 
+    this.logger.info("Looking for routes");
     this.loopLayers(this.express, this.basePath);
     this.locateSamePath(breakOnSamePath);
 
@@ -42,6 +45,8 @@ export class ExpressToAMS {
    * @param breakOnSamePath - should throw error if a same path found?
    */
   private locateSamePath(breakOnSamePath: boolean) {
+    this.logger.info("Looking for pathes overlap");
+
     const pathes: { [path: string]: { [method in Methods]?: boolean } } = {};
     let foundSamePath = false;
 
@@ -54,7 +59,7 @@ export class ExpressToAMS {
         else if (pathes[kindaParamlessPath][method] === false) {
           foundSamePath = true;
           pathes[kindaParamlessPath][method] = true;
-          console.warn(
+          this.logger.warn(
             `There is more than one path with the syntax of ${kindaParamlessPath} and the method of ${method}`
           );
         }
@@ -181,6 +186,7 @@ export class ExpressToAMS {
    */
   private addEndpoint(path: string, method: Methods, endpoint?: Partial<EndpointWithPolicyObj>) {
     if (!this.endpoints[path]) this.endpoints[path] = {};
+    method = method.toUpperCase() as Methods;
 
     const oldEndpoint = this.endpoints[path][method] || ({ policies: {} } as EndpointWithPolicyObj);
 
@@ -204,6 +210,8 @@ export class ExpressToAMS {
       ...(endpoint || {}),
       policies
     };
+
+    this.logger.info(`Adding endpoint: ${method} ${path}`);
   }
 
   /**
@@ -271,7 +279,7 @@ export class ExpressToAMS {
       .replace(/[^A-z0-9\-]/g, '')
       .substr(0, 30);
 
-    return `${ExpressToAMS.trimMinus(path)}-${method}-${++this.operationIdCount}`;
+    return `amsify-${ExpressToAMS.trimMinus(path)}-${method}-${++this.operationIdCount}`;
   }
 
   /**
@@ -369,6 +377,8 @@ export interface EndpointWithPolicyObj extends Omit<Endpoint, 'policies'> {
   policies: {
     [key in Location]?: string[];
   };
+  /** List of tags */
+  tags?: string[];
 }
 
 export interface Endpoints {
