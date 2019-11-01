@@ -18,6 +18,7 @@
     "esModuleInterop": true,
     "noImplicitAny": false,
     "skipLibCheck": true,
+    "removeComments": false,
     "moduleResolution": "node"
   },
   "include": ["src/**/*", "declarations/**/*"],

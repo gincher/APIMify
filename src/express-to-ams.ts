@@ -26,9 +26,18 @@ export class ExpressToAMS {
   constructor(
     private express: Express | Router,
     private basePath: string = ""
-  ) {
+  ) {}
+
+  /**
+   * Execute express lookup and return endpoints
+   */
+  public exec() {
+    // Clear endpoints
+    this.endpoints = {};
+
     this.loopLayers(this.express, this.basePath);
-    console.log(JSON.stringify(this.endpoints));
+
+    return this.endpoints;
   }
 
   /**
@@ -66,7 +75,7 @@ export class ExpressToAMS {
       if (layer.route && layer.route.stack && layer.route.stack.length)
         return this.loopLayers(
           layer.route,
-          this.margePath(basePath, path),
+          ExpressToAMS.margePath(basePath, path),
           endpoints
         );
 
@@ -74,7 +83,7 @@ export class ExpressToAMS {
       if (layer.handle && "stack" in layer.handle)
         return this.loopLayers(
           layer.handle,
-          this.margePath(basePath, path),
+          ExpressToAMS.margePath(basePath, path),
           endpoints
         );
     });
@@ -85,18 +94,18 @@ export class ExpressToAMS {
    * @param layer - a layer
    */
   private getPath(layer: Layer) {
-    if (layer.path) return this.trimSlash(layer.path);
+    if (layer.path) return ExpressToAMS.trimSlash(layer.path);
     if (layer.regexp.fast_slash) return "";
-    return this.trimSlash(this.decodeRegex(layer.regexp, layer.keys));
+    return ExpressToAMS.trimSlash(this.decodeRegex(layer.regexp, layer.keys));
   }
 
   /**
    * marges paths
    * @param paths - a path to marge
    */
-  private margePath(...paths: string[]) {
+  public static margePath(...paths: string[]) {
     return paths
-      .map(path => this.trimSlash(path))
+      .map(path => ExpressToAMS.trimSlash(path))
       .filter(path => !!path.length)
       .join("/");
   }
@@ -117,7 +126,7 @@ export class ExpressToAMS {
     if (!route.stack || !route.stack.length) return false;
 
     let method: Methods;
-    const path = this.margePath(basePath, route.path);
+    const path = ExpressToAMS.margePath(basePath, route.path);
 
     const isRoute = route.stack.every(layer => {
       // If layer don't have a method, it's not a route.
@@ -286,7 +295,7 @@ export class ExpressToAMS {
    * @param method - Operation method
    */
   private generateOperationId(path: string, method: Methods) {
-    path = this.trimSlash(path)
+    path = ExpressToAMS.trimSlash(path)
       .trim()
       .toLowerCase()
       .replace(/\//g, "-")
@@ -302,7 +311,7 @@ export class ExpressToAMS {
    * @param method - Operation method
    */
   private generateOperationName(path: string, method: Methods) {
-    path = this.trimSlash(path)
+    path = ExpressToAMS.trimSlash(path)
       .replace(/\/|\-/g, " ")
       .replace(/[^A-z0-9\ ]/g, "")
       .split(" ")
@@ -326,7 +335,7 @@ export class ExpressToAMS {
    * Remove leading and trialing slash
    * @param str - string to trim slashes
    */
-  private trimSlash(str: string) {
+  public static trimSlash(str: string) {
     return str.trim().replace(/\/$|^\//g, "");
   }
 
@@ -388,7 +397,7 @@ export interface EndpointWithPolicyObj extends Omit<Endpoint, "policies"> {
   };
 }
 
-interface Endpoints {
+export interface Endpoints {
   [path: string]: {
     [method in Methods]?: EndpointWithPolicyObj;
   };
