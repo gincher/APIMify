@@ -12,7 +12,7 @@
     "url": "https://github.com/GINCHER/APIMify.git"
   },
   "scripts": {
-    "test": "jest --ci"
+    "build": "tsc"
   },
   "keywords": [
     "azure",
