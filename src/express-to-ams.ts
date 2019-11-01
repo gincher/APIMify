@@ -30,14 +30,43 @@ export class ExpressToAMS {
 
   /**
    * Execute express lookup and return endpoints
+   * @param breakOnSamePath - should it throw an error if there is
+   *                          same path more than once.
    */
-  public exec() {
+  public exec(breakOnSamePath: boolean) {
     // Clear endpoints
     this.endpoints = {};
 
     this.loopLayers(this.express, this.basePath);
+    this.locateSamePath(breakOnSamePath);
 
     return this.endpoints;
+  }
+
+  private locateSamePath(breakOnSamePath: boolean) {
+    const pathes: { [path: string]: { [method in Methods]?: boolean } } = {};
+    let foundSamePath = false;
+
+    Object.entries(this.endpoints).forEach(([path, methodObj]) =>
+      Object.keys(methodObj).forEach(method => {
+        const kindaParamlessPath = path.replace(/\{.*?\}/g, "{param}");
+
+        if (!pathes[kindaParamlessPath])
+          pathes[kindaParamlessPath] = { [method]: false };
+        else if (pathes[kindaParamlessPath][method] === undefined)
+          pathes[kindaParamlessPath][method] = false;
+        else if (pathes[kindaParamlessPath][method] === false) {
+          foundSamePath = true;
+          pathes[kindaParamlessPath][method] = true;
+          console.error(
+            `There is more than one path with the syntax of ${kindaParamlessPath} and the method of ${method}`
+          );
+        }
+      })
+    );
+
+    if (foundSamePath && breakOnSamePath)
+      throw new Error("Found more than one path with the same syntax");
   }
 
   /**

@@ -14,15 +14,22 @@ class AMSify {
 
   public async sync() {
     const client = await this.authentication.authenticate();
-    const endpoints = this.expressToAMS.exec();
+    const endpoints = this.expressToAMS.exec(
+      this.config.breakOnSamePath || false
+    );
 
     const ams = new AMS(
+      this.config.apiId,
       this.config.resourceGroupName,
       this.config.serviceName,
-      this.config.apiId,
       this.config.apiVersion
     );
-    ams.exec(client, endpoints);
+    ams.exec(
+      client,
+      endpoints,
+      this.config.generateNewRevision,
+      this.config.makeNewRevisionAsCurrent
+    );
   }
 }
 
@@ -49,4 +56,24 @@ interface Config {
 
   /** Path to append to the express routes */
   basePath?: string;
+
+  /**
+   * Break when where is same path, for example `/user/:name([A-z\-]*)`
+   * and `/user/:id(\d*)` - Azure Api Management Service can't distinguish
+   * between the two.
+   * @default true
+   */
+  breakOnSamePath?: boolean;
+
+  /**
+   * Should it create a new revision?
+   * @default true
+   */
+  generateNewRevision?: boolean;
+
+  /**
+   * Should it mark the new revision as current?
+   * @default true
+   */
+  makeNewRevisionAsCurrent?: boolean;
 }

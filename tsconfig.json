@@ -11,7 +11,7 @@
     "module": "commonjs",
     "target": "es6",
     "types": ["jest"],
-    "lib": ["dom", "es2017"],
+    "lib": ["dom", "es2019"],
 
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
