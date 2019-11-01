@@ -1,10 +1,7 @@
-import { Express, Router as originalRouter } from "express";
-import {
-  OperationContract,
-  Resource
-} from "@azure/arm-apimanagement/esm/models";
-import { Location, Endpoint as EndpointEntity } from "./endpoint";
-import { RequestHandler } from "express-serve-static-core";
+import { Express, Router as originalRouter } from 'express';
+import { OperationContract, Resource } from '@azure/arm-apimanagement/esm/models';
+import { Location, Endpoint as EndpointEntity } from './endpoint';
+import { RequestHandler } from 'express-serve-static-core';
 
 /**
  * Converts Express app or router to AMS
@@ -23,10 +20,7 @@ export class ExpressToAMS {
    * @param express - express app or router
    * @param basePath - base path for the endpoints
    */
-  constructor(
-    private express: Express | Router,
-    private basePath: string = ""
-  ) {}
+  constructor(private express: Express | Router, private basePath: string = '') {}
 
   /**
    * Execute express lookup and return endpoints
@@ -43,30 +37,31 @@ export class ExpressToAMS {
     return this.endpoints;
   }
 
+  /**
+   * Looks if there is a repeating path
+   * @param breakOnSamePath - should throw error if a same path found?
+   */
   private locateSamePath(breakOnSamePath: boolean) {
     const pathes: { [path: string]: { [method in Methods]?: boolean } } = {};
     let foundSamePath = false;
 
     Object.entries(this.endpoints).forEach(([path, methodObj]) =>
       Object.keys(methodObj).forEach(method => {
-        const kindaParamlessPath = path.replace(/\{.*?\}/g, "{param}");
+        const kindaParamlessPath = path.replace(/\{.*?\}/g, '{param}');
 
-        if (!pathes[kindaParamlessPath])
-          pathes[kindaParamlessPath] = { [method]: false };
-        else if (pathes[kindaParamlessPath][method] === undefined)
-          pathes[kindaParamlessPath][method] = false;
+        if (!pathes[kindaParamlessPath]) pathes[kindaParamlessPath] = { [method]: false };
+        else if (pathes[kindaParamlessPath][method] === undefined) pathes[kindaParamlessPath][method] = false;
         else if (pathes[kindaParamlessPath][method] === false) {
           foundSamePath = true;
           pathes[kindaParamlessPath][method] = true;
-          console.error(
+          console.warn(
             `There is more than one path with the syntax of ${kindaParamlessPath} and the method of ${method}`
           );
         }
       })
     );
 
-    if (foundSamePath && breakOnSamePath)
-      throw new Error("Found more than one path with the same syntax");
+    if (foundSamePath && breakOnSamePath) throw new Error('Found more than one path with the same syntax');
   }
 
   /**
@@ -76,17 +71,12 @@ export class ExpressToAMS {
    * @param basePath - base path for the endpoints
    * @param endpoints - endpoints list of metadata and policies
    */
-  private loopLayers(
-    express: Express | Router | Route,
-    basePath: string = "",
-    endpoints: EndpointEntity[] = []
-  ) {
-    const stack: Layer[] =
-      "_router" in express ? express._router.stack : express.stack;
+  private loopLayers(express: Express | Router | Route, basePath: string = '', endpoints: EndpointEntity[] = []) {
+    const stack: Layer[] = '_router' in express ? express._router.stack : express.stack;
 
     stack.forEach(layer => {
       // If layer is an AMSify middleware, add it to the endpoints list of metadata and policies
-      if (layer.name === "AMSEndpoint") {
+      if (layer.name === 'AMSEndpoint') {
         const endpoint = EndpointEntity.find(layer.handle as RequestHandler);
         // Recreate to prevent error due to arrays being passed by reference
         if (endpoint) endpoints = [...endpoints, endpoint];
@@ -95,26 +85,17 @@ export class ExpressToAMS {
 
       // If layer is a route, add it as an endpoint. Pass endpoints
       // by value (kinda).
-      if (layer.route && this.isRoute(layer.route, basePath, [...endpoints]))
-        return;
+      if (layer.route && this.isRoute(layer.route, basePath, [...endpoints])) return;
 
       const path = this.getPath(layer);
 
       // If has route, follow it's stack.
       if (layer.route && layer.route.stack && layer.route.stack.length)
-        return this.loopLayers(
-          layer.route,
-          ExpressToAMS.margePath(basePath, path),
-          endpoints
-        );
+        return this.loopLayers(layer.route, ExpressToAMS.margePath(basePath, path), endpoints);
 
       // If handle is a Router, follow it's stack.
-      if (layer.handle && "stack" in layer.handle)
-        return this.loopLayers(
-          layer.handle,
-          ExpressToAMS.margePath(basePath, path),
-          endpoints
-        );
+      if (layer.handle && 'stack' in layer.handle)
+        return this.loopLayers(layer.handle, ExpressToAMS.margePath(basePath, path), endpoints);
     });
   }
 
@@ -124,19 +105,8 @@ export class ExpressToAMS {
    */
   private getPath(layer: Layer) {
     if (layer.path) return ExpressToAMS.trimSlash(layer.path);
-    if (layer.regexp.fast_slash) return "";
+    if (layer.regexp.fast_slash) return '';
     return ExpressToAMS.trimSlash(this.decodeRegex(layer.regexp, layer.keys));
-  }
-
-  /**
-   * marges paths
-   * @param paths - a path to marge
-   */
-  public static margePath(...paths: string[]) {
-    return paths
-      .map(path => ExpressToAMS.trimSlash(path))
-      .filter(path => !!path.length)
-      .join("/");
   }
 
   /**
@@ -146,11 +116,7 @@ export class ExpressToAMS {
    * @param basePath - the path to append to route's path
    * @param endpoints - endpoints list of metadata and policies
    */
-  private isRoute(
-    route: Route,
-    basePath: string = "",
-    endpoints: EndpointEntity[] = []
-  ) {
+  private isRoute(route: Route, basePath: string = '', endpoints: EndpointEntity[] = []) {
     if (!route.methods) return false;
     if (!route.stack || !route.stack.length) return false;
 
@@ -166,12 +132,11 @@ export class ExpressToAMS {
       // you guessed it, it's not a route!
       if (
         !layer.handle ||
-        ("stack" in layer.handle &&
-          layer.handle.stack.some(subLayer => subLayer.name && subLayer.regexp))
+        ('stack' in layer.handle && layer.handle.stack.some(subLayer => subLayer.name && subLayer.regexp))
       )
         return false;
 
-      if (layer.name === "AMSEndpoint") {
+      if (layer.name === 'AMSEndpoint') {
         const endpoint = EndpointEntity.find(layer.handle as RequestHandler);
         if (endpoint) endpoints.push(endpoint);
       }
@@ -182,11 +147,7 @@ export class ExpressToAMS {
     });
 
     if (isRoute) {
-      this.addEndpoint(
-        `/${path}`,
-        method,
-        EndpointEntity.margeEndpoints(endpoints)
-      );
+      this.addEndpoint(`/${path}`, method, EndpointEntity.margeEndpoints(endpoints));
       return true;
     }
     return false;
@@ -204,8 +165,8 @@ export class ExpressToAMS {
 
     const path = regexStr
       .replace(this.paramRegex, (m, p1) => `${p1}:${params[counter++].name}`)
-      .replace(this.removalRegex, "")
-      .replace(this.slashRegex, "/");
+      .replace(this.removalRegex, '')
+      .replace(this.slashRegex, '/');
 
     return path;
   }
@@ -218,37 +179,19 @@ export class ExpressToAMS {
    * @param method - HTTP verb
    * @param endpoint - endpoint information
    */
-  private addEndpoint(
-    path: string,
-    method: Methods,
-    endpoint?: Partial<EndpointWithPolicyObj>
-  ) {
+  private addEndpoint(path: string, method: Methods, endpoint?: Partial<EndpointWithPolicyObj>) {
     if (!this.endpoints[path]) this.endpoints[path] = {};
 
-    const oldEndpoint =
-      this.endpoints[path][method] ||
-      ({ policies: {} } as EndpointWithPolicyObj);
+    const oldEndpoint = this.endpoints[path][method] || ({ policies: {} } as EndpointWithPolicyObj);
 
     const { urlTemplate, templateParameters } = this.getParams(path);
     const operationId = this.generateOperationId(path, method);
     const displayName = this.generateOperationName(path, method);
-    const policies: EndpointWithPolicyObj["policies"] = {
-      inbound: [
-        ...(oldEndpoint.policies.inbound || []),
-        ...(endpoint.policies.inbound || [])
-      ],
-      backend: [
-        ...(oldEndpoint.policies.backend || []),
-        ...(endpoint.policies.backend || [])
-      ],
-      outbound: [
-        ...(oldEndpoint.policies.outbound || []),
-        ...(endpoint.policies.outbound || [])
-      ],
-      "on-error": [
-        ...(oldEndpoint.policies["on-error"] || []),
-        ...(endpoint.policies["on-error"] || [])
-      ]
+    const policies: EndpointWithPolicyObj['policies'] = {
+      'inbound': [...(oldEndpoint.policies.inbound || []), ...(endpoint.policies.inbound || [])],
+      'backend': [...(oldEndpoint.policies.backend || []), ...(endpoint.policies.backend || [])],
+      'outbound': [...(oldEndpoint.policies.outbound || []), ...(endpoint.policies.outbound || [])],
+      'on-error': [...(oldEndpoint.policies['on-error'] || []), ...(endpoint.policies['on-error'] || [])]
     };
 
     this.endpoints[path][method] = {
@@ -269,18 +212,18 @@ export class ExpressToAMS {
    * @param path - full path to look for params
    */
   private getParams(path: string) {
-    const templateParameters: Endpoint["templateParameters"] = [];
+    const templateParameters: Endpoint['templateParameters'] = [];
 
     const urlTemplate = path
-      .split("/")
+      .split('/')
       // What's going on?
       .map(subPath =>
         subPath
-          .split("-")
+          .split('-')
           // Can it go even deeper?
           .map(subSubPath =>
             subSubPath
-              .split(".")
+              .split('.')
               // You bet it can!
               .map(pathPart => {
                 // if has regex or starts with :
@@ -288,20 +231,17 @@ export class ExpressToAMS {
                 const regexToCheckIfRegex = /[\:\?\+\*\(\)\|]/g;
                 if (regexToCheckIfRegex.test(pathPart)) {
                   // Remove all regexy stuff.
-                  pathPart = pathPart.replace(regexToCheckIfRegex, "");
+                  pathPart = pathPart.replace(regexToCheckIfRegex, '');
 
                   // If param name is 2 or less chars, or if param with same name
                   // exists, add one more digit.
-                  if (
-                    pathPart.length <= 2 ||
-                    templateParameters.find(param => param.name === pathPart)
-                  )
+                  if (pathPart.length <= 2 || templateParameters.find(param => param.name === pathPart))
                     pathPart = `${pathPart}P${++this.operationIdCount}`;
 
                   templateParameters.push({
                     name: pathPart,
                     required: true,
-                    type: "string"
+                    type: 'string'
                   });
 
                   // Convert to AMS path param
@@ -309,11 +249,11 @@ export class ExpressToAMS {
                 }
                 return pathPart;
               })
-              .join(".")
+              .join('.')
           )
-          .join("-")
+          .join('-')
       )
-      .join("/");
+      .join('/');
 
     return { urlTemplate, templateParameters };
   }
@@ -327,11 +267,11 @@ export class ExpressToAMS {
     path = ExpressToAMS.trimSlash(path)
       .trim()
       .toLowerCase()
-      .replace(/\//g, "-")
-      .replace(/[^A-z0-9\-]/g, "")
+      .replace(/\//g, '-')
+      .replace(/[^A-z0-9\-]/g, '')
       .substr(0, 30);
 
-    return `${this.trimMinus(path)}-${method}-${++this.operationIdCount}`;
+    return `${ExpressToAMS.trimMinus(path)}-${method}-${++this.operationIdCount}`;
   }
 
   /**
@@ -341,11 +281,11 @@ export class ExpressToAMS {
    */
   private generateOperationName(path: string, method: Methods) {
     path = ExpressToAMS.trimSlash(path)
-      .replace(/\/|\-/g, " ")
-      .replace(/[^A-z0-9\ ]/g, "")
-      .split(" ")
+      .replace(/\/|\-/g, ' ')
+      .replace(/[^A-z0-9\ ]/g, '')
+      .split(' ')
       .map(t => t && this.capitalize(t))
-      .join(" ");
+      .join(' ');
     method = this.capitalize(method) as Methods;
 
     return `${method} ${path.substr(0, 30)}`;
@@ -357,7 +297,18 @@ export class ExpressToAMS {
    */
   private capitalize(str: string) {
     const [c, ...e] = str;
-    return `${c.toUpperCase()}${e.join("").toLowerCase()}`;
+    return `${c.toUpperCase()}${e.join('').toLowerCase()}`;
+  }
+
+  /**
+   * marges paths
+   * @param paths - a path to marge
+   */
+  public static margePath(...paths: string[]) {
+    return paths
+      .map(path => ExpressToAMS.trimSlash(path))
+      .filter(path => !!path.length)
+      .join('/');
   }
 
   /**
@@ -365,19 +316,19 @@ export class ExpressToAMS {
    * @param str - string to trim slashes
    */
   public static trimSlash(str: string) {
-    return str.trim().replace(/\/$|^\//g, "");
+    return str.trim().replace(/\/$|^\//g, '');
   }
 
   /**
    * Remove leading and trialing minus
    * @param str - string to trim minuses
    */
-  private trimMinus(str: string) {
-    return str.trim().replace(/\-$|^\-/g, "");
+  private static trimMinus(str: string) {
+    return str.trim().replace(/\-$|^\-/g, '');
   }
 }
 
-type Methods = "get" | "post" | "put" | "delete" | "patch" | "options" | "head";
+type Methods = 'get' | 'post' | 'put' | 'delete' | 'patch' | 'options' | 'head';
 
 interface Key {
   name: string;
@@ -399,13 +350,7 @@ interface Layer {
   // It can be either a function or a Router, I won't use is in the types
   // to avoid `any[]`
   handle: Function | Router;
-  name:
-    | "expressInit"
-    | "query"
-    | "bound dispatch"
-    | "router"
-    | "<anonymous>"
-    | "AMSEndpoint";
+  name: 'expressInit' | 'query' | 'bound dispatch' | 'router' | '<anonymous>' | 'AMSEndpoint';
   params?: any[];
   path?: string;
   keys: Key[];
@@ -419,7 +364,7 @@ interface Endpoint extends Omit<OperationContract, keyof Resource> {
   operationId: string;
 }
 
-export interface EndpointWithPolicyObj extends Omit<Endpoint, "policies"> {
+export interface EndpointWithPolicyObj extends Omit<Endpoint, 'policies'> {
   /** Operation Policies */
   policies: {
     [key in Location]?: string[];

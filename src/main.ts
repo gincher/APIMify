@@ -1,7 +1,7 @@
-import { Express, Router, Request, Response, NextFunction } from "express";
-import { Authentication, AzureAuthentication } from "./auth";
-import { ExpressToAMS } from "./express-to-ams";
-import { AMS } from "./AMS";
+import { Express, Router, Request, Response, NextFunction } from 'express';
+import { Authentication, AzureAuthentication } from './auth';
+import { ExpressToAMS } from './express-to-ams';
+import { AMS } from './AMS';
 
 class AMSify {
   private authentication: AzureAuthentication;
@@ -14,9 +14,7 @@ class AMSify {
 
   public async sync() {
     const client = await this.authentication.authenticate();
-    const endpoints = this.expressToAMS.exec(
-      this.config.breakOnSamePath || false
-    );
+    const endpoints = this.expressToAMS.exec(this.config.breakOnSamePath || false);
 
     const ams = new AMS(
       this.config.apiId,
@@ -24,12 +22,7 @@ class AMSify {
       this.config.serviceName,
       this.config.apiVersion
     );
-    ams.exec(
-      client,
-      endpoints,
-      this.config.generateNewRevision,
-      this.config.makeNewRevisionAsCurrent
-    );
+    ams.exec(client, endpoints, this.config.generateNewRevision, this.config.makeNewRevisionAsCurrent);
   }
 }
 

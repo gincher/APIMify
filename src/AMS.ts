@@ -1,12 +1,15 @@
-import { ApiManagementClient } from "@azure/arm-apimanagement";
+import { ApiManagementClient } from '@azure/arm-apimanagement';
 import {
   OperationContract,
   TagTagResourceContractProperties,
   OperationTagResourceContractProperties,
   ApiContract
-} from "@azure/arm-apimanagement/esm/models";
-import { Endpoints, ExpressToAMS } from "./express-to-ams";
+} from '@azure/arm-apimanagement/esm/models';
+import { Endpoints, ExpressToAMS } from './express-to-ams';
 
+/**
+ * Class for interacting with AMS
+ */
 export class AMS {
   /** instance of the Azure AMS client */
   private client: ApiManagementClient;
@@ -19,7 +22,7 @@ export class AMS {
   /** API version-less path */
   private apiPath: string;
   /** base path for routes */
-  private basePath: string = "";
+  private basePath: string = '';
   /** list of endpoints to add */
   private endpoints: Endpoints;
   /** List of existing tags */
@@ -46,7 +49,7 @@ export class AMS {
     if (basePath) this.basePath = ExpressToAMS.trimSlash(basePath);
 
     // Split revision, if set, from api name.
-    const [apiId, apiRevision] = apiName.split(";rev=");
+    const [apiId, apiRevision] = apiName.split(';rev=');
     this.apiId = apiId;
     this.apiRevision = apiRevision && parseInt(apiRevision);
   }
@@ -79,11 +82,7 @@ export class AMS {
   private async createRevision() {
     // List all revisions of the api
     const revisions = await this.getAll(
-      this.client.apiRevision.listByService(
-        this.resourceGroupName,
-        this.serviceName,
-        this.apiId
-      ),
+      this.client.apiRevision.listByService(this.resourceGroupName, this.serviceName, this.apiId),
       next => this.client.apiRevision.listByServiceNext(next)
     );
 
@@ -101,7 +100,7 @@ export class AMS {
       `${this.apiId};rev=${lastRev + 1}`,
       {
         sourceApiId: this.fullApiId,
-        apiRevisionDescription: "Auto-created revision by AMSify",
+        apiRevisionDescription: 'Auto-created revision by AMSify',
         path: this.apiPath
       }
     );
@@ -111,6 +110,9 @@ export class AMS {
     this.apiRevision = parseInt(newApi.apiRevision);
   }
 
+  /**
+   * Makes revision current
+   */
   private async setRevisionAsCurrent() {
     await this.client.apiRelease.createOrUpdate(
       this.resourceGroupName,
@@ -119,7 +121,7 @@ export class AMS {
       `amsify${this.apiRevision}release`,
       {
         apiId: this.fullApiId,
-        notes: "Auto-created revision by AMSify"
+        notes: 'Auto-created revision by AMSify'
       }
     );
   }
@@ -137,12 +139,9 @@ export class AMS {
     } = {};
 
     const operationsByTags = await this.getAll(
-      this.client.operation.listByTags(
-        this.resourceGroupName,
-        this.serviceName,
-        this.apiName,
-        { includeNotTaggedOperations: true }
-      ),
+      this.client.operation.listByTags(this.resourceGroupName, this.serviceName, this.apiName, {
+        includeNotTaggedOperations: true
+      }),
       next =>
         this.client.operation.listByTagsNext(next, {
           includeNotTaggedOperations: true
@@ -152,20 +151,14 @@ export class AMS {
     operationsByTags.forEach(tagObj => {
       if (tagObj.operation) {
         // If operation is not under base path, skip.
-        if (
-          this.basePath &&
-          !tagObj.operation.urlTemplate.startsWith(`/${this.basePath}`)
-        )
-          return;
+        if (this.basePath && !tagObj.operation.urlTemplate.startsWith(`/${this.basePath}`)) return;
 
         // Append operation to the operationObj, and add it's tags
         operationsObj[tagObj.operation.id] = {
           ...tagObj.operation,
           tags: [
             // Add previous tags
-            ...((operationsObj[tagObj.operation.id] &&
-              operationsObj[tagObj.operation.id].tags) ||
-              []),
+            ...((operationsObj[tagObj.operation.id] && operationsObj[tagObj.operation.id].tags) || []),
             // Add new tag
             ...((tagObj.tag && [tagObj.tag.id]) || [])
           ]
@@ -173,7 +166,7 @@ export class AMS {
       }
       // If has tag, append to ag list
       if (tagObj.tag) {
-        if (tagObj.tag.name === "amsify") AMSifyTag = tagObj.tag;
+        if (tagObj.tag.name === 'amsify') AMSifyTag = tagObj.tag;
         tags[tagObj.tag.id] = tagObj.tag;
       }
     });
@@ -195,10 +188,8 @@ export class AMS {
 
     const setAPI = (api: ApiContract) => {
       // If manually set api revision, update the full api identification
-      const [fullApiId] = api.id.split(";rev=");
-      this.fullApiId = this.apiRevision
-        ? `${fullApiId};rev=${this.apiRevision}`
-        : api.id;
+      const [fullApiId] = api.id.split(';rev=');
+      this.fullApiId = this.apiRevision ? `${fullApiId};rev=${this.apiRevision}` : api.id;
 
       this.apiId = api.name;
       this.apiPath = api.path;
@@ -211,9 +202,7 @@ export class AMS {
       const api = apis.find(
         api =>
           api.apiVersion === this.apiVersion &&
-          (api.displayName === this.apiId ||
-            api.path === this.apiId ||
-            api.name === this.apiId)
+          (api.displayName === this.apiId || api.path === this.apiId || api.name === this.apiId)
       );
 
       if (api) return setAPI(api);
@@ -224,21 +213,18 @@ export class AMS {
     if (apiByName) return setAPI(apiByName);
 
     // Then search by display name or path
-    const apiByDisplayName = apis.find(
-      api => api.displayName === this.apiId || api.path === this.apiId
-    );
+    const apiByDisplayName = apis.find(api => api.displayName === this.apiId || api.path === this.apiId);
     if (apiByDisplayName) return setAPI(apiByDisplayName);
 
-    throw new Error("API not found");
+    throw new Error('API not found');
   }
 
   /**
    * Returns a list of apis
    */
   private listApis() {
-    return this.getAll(
-      this.client.api.listByService(this.resourceGroupName, this.serviceName),
-      next => this.client.api.listByServiceNext(next)
+    return this.getAll(this.client.api.listByService(this.resourceGroupName, this.serviceName), next =>
+      this.client.api.listByServiceNext(next)
     );
   }
 
@@ -251,11 +237,11 @@ export class AMS {
     firstFunc: (() => Promise<T>) | Promise<T>,
     nextLinkFunc: (next: string) => Promise<T>
   ): Promise<T> {
-    let res = await (typeof firstFunc === "function" ? firstFunc() : firstFunc);
-    let nextLink = "nextLink" in res && res["nextLink"];
+    let res = await (typeof firstFunc === 'function' ? firstFunc() : firstFunc);
+    let nextLink = 'nextLink' in res && res['nextLink'];
     while (nextLink) {
       const nextRes = await nextLinkFunc(nextLink);
-      nextLink = "nextLink" in res && res["nextLink"];
+      nextLink = 'nextLink' in res && res['nextLink'];
       res = [...(res as any), ...(nextRes as any)] as any;
     }
     return res;

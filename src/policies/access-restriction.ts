@@ -1,5 +1,5 @@
-import { begin } from "xmlbuilder";
-import { Policy } from "../endpoint";
+import { begin } from 'xmlbuilder';
+import { Policy } from '../endpoint';
 
 /**
  * `check-header` policy:
@@ -7,17 +7,14 @@ import { Policy } from "../endpoint";
  * @param config - Policy config
  * @param location - where to place the policy
  */
-export const checkHeader = (
-  config: CheckHeaderAttributes,
-  location: "inbound" | "outbound" = "inbound"
-) => {
+export const checkHeader = (config: CheckHeaderAttributes, location: 'inbound' | 'outbound' = 'inbound') => {
   const { value, ...attr } = config;
 
-  const root = begin().element("check-header", {
+  const root = begin().element('check-header', {
     ...attr,
-    "ignore-case": attr["ignore-case"] ? "True" : "False"
+    'ignore-case': attr['ignore-case'] ? 'True' : 'False'
   });
-  if (value) value.forEach(v => root.element("value", {}, v));
+  if (value) value.forEach(v => root.element('value', {}, v));
 
   const xml = root.end({
     pretty: true
@@ -31,27 +28,27 @@ interface CheckHeaderAttributes {
    * Allowed HTTP header value. When multiple value elements are specified,
    * the check is considered a success if any one of the values is a match.
    */
-  value?: string[];
+  'value'?: string[];
   /**
    * Error message to return in the HTTP response body if the header doesn't
    * exist or has an invalid value. This message must have any special
    * characters properly escaped.
    */
-  "failed-check-error-message": string;
+  'failed-check-error-message': string;
   /**
    * HTTP Status code to return if the header doesn't exist or has an invalid
    * value.
    */
-  "failed-check-httpcode": number;
+  'failed-check-httpcode': number;
   /**
    * The name of the HTTP Header to check.
    */
-  "header-name": string;
+  'header-name': string;
   /**
    * If set to True case is ignored when the header value is compared against
    * the set of acceptable values.
    */
-  "ignore-case": boolean;
+  'ignore-case': boolean;
 }
 
 /**
@@ -63,19 +60,19 @@ interface CheckHeaderAttributes {
 export const rateLimit = (config: RateLimitAttributes) => {
   const { api, ...attr } = config;
 
-  const root = begin().element("rate-limit", attr);
+  const root = begin().element('rate-limit', attr);
   if (api)
     api.forEach(a => {
       const { operation, ...attr } = a;
-      const apiElem = root.element("api", attr);
-      if (operation) operation.forEach(op => apiElem.element("operation", op));
+      const apiElem = root.element('api', attr);
+      if (operation) operation.forEach(op => apiElem.element('operation', op));
     });
 
   const xml = root.end({
     pretty: true
   });
 
-  return Policy.create(xml, "inbound");
+  return Policy.create(xml, 'inbound');
 };
 
 interface CoreRateLimitAttributes {
@@ -83,11 +80,11 @@ interface CoreRateLimitAttributes {
    * The maximum total number of calls allowed during the time interval specified
    * in the renewal-period.
    */
-  calls: number;
+  'calls': number;
   /**
    * The time period in seconds after which the quota resets.
    */
-  "renewal-period": number;
+  'renewal-period': number;
 }
 
 interface RateLimitAttributes extends CoreRateLimitAttributes {
@@ -116,39 +113,39 @@ interface RateLimitAttributes extends CoreRateLimitAttributes {
 }
 
 /**
- * `check-header` policy:
- * https://docs.microsoft.com/en-us/azure/api-management/api-management-access-restriction-policies#CheckHTTPHeader
+ * `rate-limit-by-key` policy:
+ * https://docs.microsoft.com/en-us/azure/api-management/api-management-access-restriction-policies#LimitCallRateByKey
  * @param config - Policy config
  * @param location - where to place the policy
  */
 export const rateLimitByKey = (config: RateLimitByKeyAttributes) => {
-  const root = begin().element("rate-limit-by-key	", {
+  const root = begin().element('rate-limit-by-key	', {
     ...config,
-    "increment-condition": config["increment-condition"] ? "True" : "False"
+    'increment-condition': config['increment-condition'] ? 'True' : 'False'
   });
 
   const xml = root.end({
     pretty: true
   });
 
-  return Policy.create(xml, "inbound");
+  return Policy.create(xml, 'inbound');
 };
 
 interface RateLimitByKeyAttributes {
   /**
    * The maximum total number of calls allowed during the time interval specified in the renewal-period.
    */
-  calls: string;
+  'calls': string;
   /**
    *     The key to use for the rate limit policy.
    */
-  "counter-key": string;
+  'counter-key': string;
   /**
    * 	The boolean expression specifying if the request should be counted towards the quota (true).
    */
-  "increment-condition"?: boolean;
+  'increment-condition'?: boolean;
   /**
    * 	The time period in seconds after which the quota resets.
    */
-  "renewal-period": string;
+  'renewal-period': string;
 }

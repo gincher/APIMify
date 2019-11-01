@@ -1,10 +1,6 @@
-import {
-  AzureCliCredentials,
-  interactiveLogin,
-  loginWithUsernamePassword
-} from "@azure/ms-rest-nodeauth";
-import { ApiManagementClient } from "@azure/arm-apimanagement";
-import { ServiceClientCredentials } from "@azure/ms-rest-js";
+import { AzureCliCredentials, interactiveLogin, loginWithUsernamePassword } from '@azure/ms-rest-nodeauth';
+import { ApiManagementClient } from '@azure/arm-apimanagement';
+import { ServiceClientCredentials } from '@azure/ms-rest-js';
 
 /**
  * Authentication class
@@ -23,26 +19,22 @@ export class AzureAuthentication {
     let credentials: ServiceClientCredentials;
     let subscription: string;
 
-    if (!!this.authentication && "username" in this.authentication) {
+    if (!!this.authentication && 'username' in this.authentication) {
       // Username and password authentication
-      credentials = await this.usernamePassword(
-        this.authentication.username,
-        this.authentication.password
-      );
+      credentials = await this.usernamePassword(this.authentication.username, this.authentication.password);
       subscription = this.authentication.subscription;
-    } else if (!!this.authentication && "credentials" in this.authentication) {
+    } else if (!!this.authentication && 'credentials' in this.authentication) {
       // Credentials authentication
       credentials = this.authentication.credentials;
       subscription = this.authentication.subscription;
-    } else if (!!this.authentication && "subscription" in this.authentication) {
+    } else if (!!this.authentication && 'subscription' in this.authentication) {
       // Interactive authentication
       credentials = await this.interactive();
       subscription = this.authentication.subscription;
     } else {
       // CLI Authentication
       credentials = await this.CLI();
-      subscription = (credentials as AzureCliCredentials).tokenInfo
-        .subscription;
+      subscription = (credentials as AzureCliCredentials).tokenInfo.subscription;
     }
 
     return this.getClient(credentials, subscription);
@@ -53,10 +45,7 @@ export class AzureAuthentication {
    * @param credentials - Credentials needed for the client to connect to Azure.
    * @param subscription - Microsoft Azure subscription.
    */
-  private getClient(
-    credentials: ServiceClientCredentials,
-    subscription: string
-  ) {
+  private getClient(credentials: ServiceClientCredentials, subscription: string) {
     return new ApiManagementClient(credentials, subscription);
   }
 
@@ -99,7 +88,4 @@ interface credentialsAuthentication {
   credentials: ServiceClientCredentials;
 }
 
-export type Authentication =
-  | UsernamePasswordAuthentication
-  | InteractiveAuthentication
-  | credentialsAuthentication;
+export type Authentication = UsernamePasswordAuthentication | InteractiveAuthentication | credentialsAuthentication;

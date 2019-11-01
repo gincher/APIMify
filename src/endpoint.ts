@@ -1,6 +1,9 @@
-import { RequestHandler } from "express";
-import { EndpointWithPolicyObj } from "./express-to-ams";
+import { RequestHandler } from 'express';
+import { EndpointWithPolicyObj } from './express-to-ams';
 
+/**
+ * Abstract class to extend the Policy class and the Metadata class
+ */
 export abstract class Endpoint {
   /** list of used policies */
   protected static endpoints: (Endpoint)[] = [];
@@ -13,7 +16,7 @@ export abstract class Endpoint {
    */
   constructor() {
     this.func = (req, res, next) => next();
-    Object.defineProperty(this.func, "name", { value: "AMSEndpoint" });
+    Object.defineProperty(this.func, 'name', { value: 'AMSEndpoint' });
   }
 
   /**
@@ -43,8 +46,7 @@ export abstract class Endpoint {
     let finalEndpoint: Partial<EndpointWithPolicyObj> = { policies: {} };
 
     endpoints.forEach(endpoint => {
-      if (endpoint instanceof Metadata)
-        finalEndpoint = { ...finalEndpoint, ...endpoint.endpointMetadata };
+      if (endpoint instanceof Metadata) finalEndpoint = { ...finalEndpoint, ...endpoint.endpointMetadata };
       if (endpoint instanceof Policy)
         finalEndpoint.policies[endpoint.location] = [
           ...(finalEndpoint.policies[endpoint.location] || []),
@@ -56,6 +58,9 @@ export abstract class Endpoint {
   }
 }
 
+/**
+ * Metadata class to manually change the endpoint properties
+ */
 export class Metadata extends Endpoint {
   /** Endpoint's metadata */
   public endpointMetadata: EndpointMetadata;
@@ -82,6 +87,9 @@ export class Metadata extends Endpoint {
   }
 }
 
+/**
+ * Policy class to append XML policy to the endpoint
+ */
 export class Policy extends Endpoint {
   /** The XML to append */
   public xml: string;
@@ -125,9 +133,9 @@ export class Policy extends Endpoint {
  * `outbound`: statements to be applied to the response.
  * `on-error`: statements to be applied if there is an error condition.
  */
-export type Location = "inbound" | "backend" | "outbound" | "on-error";
+export type Location = 'inbound' | 'backend' | 'outbound' | 'on-error';
 
 /**
  * Endpoint's metadata
  */
-export type EndpointMetadata = Partial<Omit<EndpointWithPolicyObj, "policies">>;
+export type EndpointMetadata = Partial<Omit<EndpointWithPolicyObj, 'policies'>>;

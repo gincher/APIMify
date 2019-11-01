@@ -9,7 +9,7 @@
     "declaration": true,
 
     "module": "commonjs",
-    "target": "es6",
+    "target": "es5",
     "types": ["jest"],
     "lib": ["dom", "es2019"],
 
@@ -19,6 +19,7 @@
     "noImplicitAny": false,
     "skipLibCheck": true,
     "removeComments": false,
+    "downlevelIteration": true,
     "moduleResolution": "node"
   },
   "include": ["src/**/*", "declarations/**/*"],
