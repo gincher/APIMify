@@ -18,11 +18,11 @@ jobs:
           node-version: 12
       - name: npm install
         run: npm install
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: compile typescript
         run: npm run build
       - name: npm publish
-        run: npm publish
+        run: |
+          npm config set '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
+          npm publish
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
