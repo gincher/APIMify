@@ -2,7 +2,7 @@
 
 Sync automatically your ExpressJs server with Azure Api Management Service.
 
-[![NPM Version][npm-image]][npm-url]
+[![NPM Version](https://img.shields.io/npm/v/apimify.svg)](https://npmjs.org/package/apimify) [![Dependency Status](https://david-dm.org/GINCHER/APIMify.svg)](https://david-dm.org/GINCHER/APIMify) ![GitHub top language](https://img.shields.io/github/languages/top/GINCHER/APIMify) ![GitHub](https://img.shields.io/github/license/GINCHER/APIMify)
 
 ```typescript
 import { APIMify } from "apimify";
@@ -228,7 +228,3 @@ This is a slow process, so I recommend using it in a CI/CD process and not on ev
 ## License
 
 [MIT License](LICENSE)
-
-
-[npm-image]: https://img.shields.io/npm/v/apimify.svg
-[npm-url]: https://npmjs.org/package/apimify
