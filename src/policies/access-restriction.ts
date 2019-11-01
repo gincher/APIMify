@@ -12,7 +12,7 @@ export const checkHeader = (config: CheckHeaderAttributes, location: 'inbound' |
 
   const root = begin().element('check-header', {
     ...attr,
-    'ignore-case': attr['ignore-case'] ? 'True' : 'False'
+    'ignore-case': attr['ignore-case'] ? 'true' : 'false'
   });
   if (value) value.forEach(v => root.element('value', {}, v));
 
@@ -43,7 +43,7 @@ interface CheckHeaderAttributes {
   /**
    * The name of the HTTP Header to check.
    */
-  'header-name': string;
+  'name': string;
   /**
    * If set to True case is ignored when the header value is compared against
    * the set of acceptable values.
@@ -121,7 +121,7 @@ interface RateLimitAttributes extends CoreRateLimitAttributes {
 export const rateLimitByKey = (config: RateLimitByKeyAttributes) => {
   const root = begin().element('rate-limit-by-key	', {
     ...config,
-    'increment-condition': config['increment-condition'] ? 'True' : 'False'
+    'increment-condition': config['increment-condition'] ? 'true' : 'false'
   });
 
   const xml = root.end({

@@ -193,6 +193,7 @@ export class ExpressToAPIM {
     const { urlTemplate, templateParameters } = this.getParams(path);
     const operationId = this.generateOperationId(path, method);
     const displayName = this.generateOperationName(path, method);
+    const tags: EndpointWithPolicyObj['tags'] = [...(oldEndpoint.tags || []), ...(endpoint.tags || [])];
     const policies: EndpointWithPolicyObj['policies'] = {
       'inbound': [...(oldEndpoint.policies.inbound || []), ...(endpoint.policies.inbound || [])],
       'backend': [...(oldEndpoint.policies.backend || []), ...(endpoint.policies.backend || [])],
@@ -208,7 +209,8 @@ export class ExpressToAPIM {
       templateParameters,
       ...(oldEndpoint || {}),
       ...(endpoint || {}),
-      policies
+      policies,
+      tags
     };
 
     this.logger.info(`Adding endpoint: ${method} ${path}`);

@@ -1,9 +1,10 @@
 import { ApiManagementClient } from '@azure/arm-apimanagement';
-import { TagTagResourceContractProperties, ApiContract, OperationContract } from '@azure/arm-apimanagement/esm/models';
+import { ApiContract, OperationContract, TagContract } from '@azure/arm-apimanagement/esm/models';
 import { ExpressToAPIM, EndpointWithPolicyObj } from './express-to-apim';
 import { PromiseHelper } from './promise';
 import { Policy } from './endpoint';
 import { Logger } from './logger';
+import deepCompare from 'fast-deep-equal';
 
 /**
  * Class for interacting with APIM
@@ -24,12 +25,12 @@ export class APIM {
   /** list of endpoints to add */
   private endpoints: EndpointWithPolicyObj[];
   /** List of existing tags */
-  private tags: TagTagResourceContractProperties[] = [];
+  private tags: TagContract[] = [];
   /** Tag object of the APIMify tag */
-  private APIMifyTag: TagTagResourceContractProperties;
+  private APIMifyTag: TagContract;
 
   /** Object with tag generation promises */
-  private tagGenerators: { [tagName: string]: Promise<TagTagResourceContractProperties> } = {};
+  private tagGenerators: { [tagName: string]: Promise<TagContract> } = {};
 
   /**
    * Create APIM instance
@@ -74,14 +75,14 @@ export class APIM {
 
       await this.getApiName();
 
-      if (generateNewRevision) this.createRevision();
+      if (generateNewRevision) await this.createRevision();
 
       const oldOperations = await this.listOperations();
       if (!this.APIMifyTag) this.APIMifyTag = await this.generateTag('apimify');
 
       await this.sortOperationsByAction(oldOperations, this.endpoints);
 
-      if (makeNewRevisionAsCurrent) this.setRevisionAsCurrent();
+      if (makeNewRevisionAsCurrent) await this.setRevisionAsCurrent();
     } catch (e) {
       return Promise.reject(e);
     }
@@ -119,7 +120,7 @@ export class APIM {
         }
       );
 
-      this.apiId = newApi.name;
+      this.apiId = newApi.name.split(';rev').shift();
       this.fullApiId = newApi.id;
       this.apiRevision = parseInt(newApi.apiRevision);
     } catch (e) {
@@ -149,28 +150,28 @@ export class APIM {
    */
   private async listOperations() {
     try {
-      let APIMifyTag: TagTagResourceContractProperties;
-      const tags: { [tagId: string]: TagTagResourceContractProperties } = {};
       const operationsTagObj: {
         [operationId: string]: string[];
       } = {};
 
       this.logger.info('Requesting operations and tags from APIM');
-      const [operations, operationsWithTags] = await Promise.all([
+      const [operations, operationsWithTags, tags] = await Promise.all([
         this.getAll(this.client.apiOperation.listByApi(this.resourceGroupName, this.serviceName, this.apiName), next =>
           this.client.apiOperation.listByApiNext(name)
         ),
         this.getAll(this.client.operation.listByTags(this.resourceGroupName, this.serviceName, this.apiName), next =>
           this.client.operation.listByTagsNext(next)
+        ),
+        this.getAll(this.client.tag.listByService(this.resourceGroupName, this.serviceName), next =>
+          this.client.tag.listByServiceNext(next)
         )
-        // this.getAll(this.client.apiTagDescription.)
       ]);
+
+      this.tags = tags;
+      this.APIMifyTag = tags.find(tag => tag.displayName === 'apimify');
 
       operationsWithTags.forEach(tagObj => {
         if (!tagObj.tag) return;
-
-        if (tagObj.tag.name === 'apimify') APIMifyTag = tagObj.tag;
-        tags[tagObj.tag.id] = tagObj.tag;
 
         if (tagObj.operation) {
           const operationId = tagObj.operation.id.split('/').pop();
@@ -178,9 +179,6 @@ export class APIM {
           operationsTagObj[operationId].push(tagObj.tag.name);
         }
       });
-
-      this.tags = Object.values(tags);
-      this.APIMifyTag = APIMifyTag;
 
       return operations
         .filter(op => !this.basePath || op.urlTemplate.startsWith(`/${this.basePath}`))
@@ -203,10 +201,13 @@ export class APIM {
       const toEdit: { old: typeof oldOperations[number]; new: EndpointWithPolicyObj }[] = [];
 
       [...newOperations].forEach((newOp, newOpIndex) => {
-        const oldOpIndex = newOp.operationId.startsWith('apimify-')
+        const oldOpIndex = !newOp.operationId.startsWith('apimify-')
           ? -1
           : oldOperations.findIndex(
-              o => o.urlTemplate === newOp.urlTemplate && o.method.toUpperCase() === newOp.method.toUpperCase()
+              o =>
+                o.urlTemplate.replace(/\{(.*?)(?:P\d*?|)\}/g, '{$1}') ===
+                  newOp.urlTemplate.replace(/\{(.*?)(?:P\d*?|)\}/g, '{$1}') &&
+                o.method.toUpperCase() === newOp.method.toUpperCase()
             );
 
         if (oldOpIndex !== -1) {
@@ -267,11 +268,14 @@ export class APIM {
         operation.operationId,
         { ...operation, policies: Policy.toXML(operation.policies) }
       );
-      const tags = [...(operation.tags || []), this.APIMifyTag.name];
+      const tags = [...(operation.tags || []), this.APIMifyTag.displayName];
 
-      // Set tags, two at a time
+      // Set tags, two at a time, and set policy
       await PromiseHelper.promiseParallelQueue(
-        tags.map(tag => () => this.setTag(createdOperation.id, tag)),
+        [
+          ...tags.map(tag => () => this.setTag(createdOperation.name, tag)),
+          () => this.setPolicy(operation.operationId, Policy.toXML(operation.policies))
+        ],
         2,
         this.logger
       );
@@ -287,24 +291,34 @@ export class APIM {
    */
   private async editOperation(oldOp: OperationWithTags, newOp: EndpointWithPolicyObj) {
     try {
-      // I don't compare because sending a request to get the policies and then sending
-      // a request to update them if needed, will send more requests than sending a put
-      // request to every operation updated. Microsoft apis, am I right?
       this.logger.info(`Editing ${newOp.displayName}`);
-      this.client.apiOperation.createOrUpdate(this.resourceGroupName, this.serviceName, this.apiName, oldOp.name, {
-        description: newOp.description,
-        displayName: newOp.displayName,
-        request: newOp.request,
-        responses: newOp.responses,
-        method: newOp.method.toUpperCase(),
-        urlTemplate: newOp.urlTemplate,
-        templateParameters: newOp.templateParameters,
-        policies: Policy.toXML(newOp.policies)
-      });
+      if (
+        (newOp.description || '') !== (oldOp.description || '') ||
+        (newOp.displayName || '') !== (oldOp.displayName || '') ||
+        !deepCompare(newOp.request || {}, oldOp.request || {}) ||
+        !deepCompare(newOp.responses || [], oldOp.responses || [])
+      ) {
+        this.logger.info(`Modifying ${newOp.displayName}'s metadata`);
+        await this.client.apiOperation.createOrUpdate(
+          this.resourceGroupName,
+          this.serviceName,
+          this.apiName,
+          oldOp.name,
+          {
+            description: newOp.description,
+            displayName: newOp.displayName,
+            request: newOp.request,
+            responses: newOp.responses,
+            method: newOp.method.toUpperCase(),
+            urlTemplate: newOp.urlTemplate,
+            templateParameters: newOp.templateParameters
+          }
+        );
+      }
 
       // Check for tags to be updated
       const oldTags = [...(oldOp.tags || [])];
-      const newTags = [...(newOp.tags || [])];
+      const newTags = [...(newOp.tags || []), this.APIMifyTag.displayName];
       // Remove tags that are both old and new
       [...newTags].forEach((newTag, index) => {
         const oldTag = oldTags.findIndex(o => o === newTag);
@@ -312,11 +326,16 @@ export class APIM {
         oldTags.splice(oldTag, 1);
         newTags.splice(index, 1);
       });
-      // Delete and set tags
+
+      // Delete and set tags, and set policy
       await PromiseHelper.promiseParallelQueue<any>(
         [
           ...oldTags.map(tag => () => this.removeTag(oldOp.name, tag)),
-          ...newTags.map(tag => () => this.setTag(oldOp.name, tag))
+          ...newTags.map(tag => () => this.setTag(oldOp.name, tag)),
+          // I don't compare because sending a request to get the policies and then sending
+          // a request to update them if needed, will send more requests than sending a put
+          // request to every operation updated. Microsoft apis, am I right?
+          () => this.setPolicy(oldOp.name, Policy.toXML(newOp.policies))
         ],
         2,
         this.logger
@@ -327,13 +346,31 @@ export class APIM {
   }
 
   /**
+   * set policy to an operation
+   * @param operationId - the operation ID
+   * @param xml - the policy
+   */
+  private setPolicy(operationId: string, xml: string) {
+    this.logger.info(`Setting policy to ${operationId}`);
+    return this.client.apiOperationPolicy.createOrUpdate(
+      this.resourceGroupName,
+      this.serviceName,
+      this.apiName,
+      operationId,
+      { format: 'rawxml', value: xml }
+    );
+  }
+
+  /**
    * Assign tag to an operation
    * @param operationId - the operation ID
    * @param tagName - the name of the tag
    */
   private async setTag(operationId: string, tagName: string) {
+    if (!tagName.replace(/[^A-z0-9]/g, '').length) return;
+
     try {
-      let tag = this.tags.find(t => t.name === tagName);
+      let tag = this.tags.find(t => t.displayName === tagName);
       if (!tag) tag = await this.generateTag(tagName);
 
       this.logger.info(`Assigning tag ${tagName} to ${operationId}`);
@@ -341,8 +378,8 @@ export class APIM {
         this.resourceGroupName,
         this.serviceName,
         this.apiName,
-        operationId.split('/').pop(),
-        tag.id
+        operationId,
+        tag.name
       );
     } catch (e) {
       return Promise.reject(e);
@@ -355,7 +392,7 @@ export class APIM {
    * @param tagName - the name of the tag
    */
   private removeTag(operationId: string, tagName: string) {
-    const tag = this.tags.find(t => t.name === tagName);
+    const tag = this.tags.find(t => t.displayName === tagName);
     if (!tag) return;
 
     this.logger.info(`detaching tag ${tagName} to ${operationId}`);
@@ -363,8 +400,8 @@ export class APIM {
       this.resourceGroupName,
       this.serviceName,
       this.apiName,
-      operationId.split('/').pop(),
-      tag.id
+      operationId,
+      tag.name
     );
   }
 
@@ -373,6 +410,11 @@ export class APIM {
    * @param tagName - tag's name
    */
   private async generateTag(tagName: string) {
+    if (!tagName.replace(/[^A-z0-9]/g, '').length) return;
+
+    const tag = this.tags.find(t => t.displayName === tagName);
+    if (tag) return tag;
+
     try {
       tagName = tagName.trim();
 
@@ -381,9 +423,9 @@ export class APIM {
       if (this.tagGenerators[tagName]) return this.tagGenerators[tagName];
 
       this.logger.info(`Creating tag ${tagName}`);
-      const promise = new Promise(async (resolve, reject) => {
+      const promise = new Promise<TagContract>(async (resolve, reject) => {
         try {
-          const tagId = tagName.replace(/[!A-z0-9]/g, '') + Date.now();
+          const tagId = tagName.replace(/[^A-z0-9]/g, '') + Date.now();
 
           const tag = await this.client.tag.createOrUpdate(this.resourceGroupName, this.serviceName, tagId, {
             displayName: tagName
