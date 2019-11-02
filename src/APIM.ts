@@ -59,7 +59,9 @@ export class APIM {
   }
 
   /**
-   *
+   * Start the syncing operations
+   * @param client - APIM client
+   * @param endpoints - List of endpoints from expressjs
    * @param generateNewRevision - Should it create a new revision?
    * @param makeNewRevisionAsCurrent - Should it mark the new revision as current?
    */
@@ -157,7 +159,7 @@ export class APIM {
       this.logger.info('Requesting operations and tags from APIM');
       const [operations, operationsWithTags, tags] = await Promise.all([
         this.getAll(this.client.apiOperation.listByApi(this.resourceGroupName, this.serviceName, this.apiName), next =>
-          this.client.apiOperation.listByApiNext(name)
+          this.client.apiOperation.listByApiNext(next)
         ),
         this.getAll(this.client.operation.listByTags(this.resourceGroupName, this.serviceName, this.apiName), next =>
           this.client.operation.listByTagsNext(next)
