@@ -357,8 +357,6 @@ interface Router extends originalRouter {
 }
 
 interface Layer {
-  // It can be either a function or a Router, I won't use is in the types
-  // to avoid `any[]`
   handle: Function | Router;
   name: 'expressInit' | 'query' | 'bound dispatch' | 'router' | '<anonymous>' | 'APIMEndpoint';
   params?: any[];

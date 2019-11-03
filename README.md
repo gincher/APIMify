@@ -223,7 +223,7 @@ I'll be adding more soon
 
 Running `sync()` will **delete all existing operations if they don't have an express route** - so be carful! Start by setting `generateNewRevision` to true and `makeNewRevisionAsCurrent` to false, check if everything works, make sure that the deletion of the operations don't affect your API, look for policies you might forgot, etc. If all looks OK, you can set `makeNewRevisionAsCurrent` to true and forget from the APIM portal.
 
-This is a slow process, so I recommend using it in a CI/CD process and not on every app initiation - place APIMify in a separate file from the one initiates the express server and call it only when you need it.
+This is a slow process, so I recommend using it as a CI/CD step and not on every app initiation - place APIMify in a separate file from the one initiates the express server and call it only when you need it.
 
 ## License
 
