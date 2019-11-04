@@ -10,7 +10,7 @@ import { Logger } from './logger';
 export class ExpressToAPIM {
   // I never liked using regex, but now I'm really hating it.
   private paramRegex = /\(\?\:(\\\/|)\(.*?\)\)\??/gi;
-  private removalRegex = /\/\^|\/i|\\\/\?\$|\\\/\?\(\?\=\\\/\|\$\)/gi;
+  private removalRegex = /\/\^|\/i$|\\\/\?\$|\\\/\?\(\?\=\\\/\|\$\)/gi;
   private slashRegex = /\\\//gi;
 
   private operationIdCount = 0;
