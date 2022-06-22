@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@azure/arm-apimanagement": "^5.1.1",
-    "@azure/ms-rest-nodeauth": "^2.0.5",
+    "@azure/ms-rest-nodeauth": "^3.0.8",
     "fast-deep-equal": "^2.0.1",
     "xmlbuilder": "^13.0.2"
   },
